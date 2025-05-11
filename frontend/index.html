@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>EPI Detection</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #4e54c8, #8f94fb);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      color: #333;
+    }
+    .container {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+      max-width: 600px;
+      width: 100%;
+      padding: 30px;
+    }
+    h1 {
+      text-align: center;
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+      color: #4e54c8;
+    }
+    #uploadTime {
+      text-align: center;
+      font-size: 0.9rem;
+      color: #666;
+      margin-bottom: 20px;
+      display: none;
+    }
+
+    .upload-zone {
+      position: relative;
+      border: 2px dashed #aaa;
+      border-radius: 8px;
+      padding: 40px;
+      text-align: center;
+      cursor: pointer;
+      transition: background .2s, border-color .2s;
+      overflow: hidden;
+      margin-bottom: 20px;
+      background: #fafafa;
+    }
+    .upload-zone.dragover {
+      border-color: #4e54c8;
+      background: #f0f0ff;
+    }
+    .upload-zone input {
+      position: absolute;
+      top:0; left:0; width:100%; height:100%;
+      opacity:0; cursor:pointer;
+    }
+    .upload-zone img.preview {
+      position: absolute;
+      top:0; left:0; width:100%; height:100%;
+      object-fit: contain;
+      display: none;
+    }
+    .upload-zone .placeholder {
+      position: relative;
+      z-index: 1;
+      color: #666;
+      transition: opacity .2s;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    button {
+      padding: 10px 18px;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    button:disabled { opacity: .6; cursor:not-allowed; }
+    .btn-primary {
+      background: #4e54c8; color: #fff;
+    }
+    .btn-primary:hover:not(:disabled) { background: #3b3f9c; }
+    .btn-download {
+      background: #28a745; color: #fff;
+    }
+    .btn-download:hover:not(:disabled) { background: #218838; }
+
+    .spinner {
+      border: 4px solid rgba(0,0,0,0.1);
+      border-top: 4px solid #4e54c8;
+      border-radius: 50%;
+      width: 24px; height: 24px;
+      animation: spin 1s linear infinite;
+      display: inline-block;
+      vertical-align: middle;
+      margin-left: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .status-box {
+      background: #fff;
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+      margin-bottom: 20px;
+      display: none;
+    }
+    .status-box h2 {
+      margin-bottom: 10px;
+      font-size: 1.3rem;
+    }
+    .status-box h2.warning { color: #dc3545; }
+    .status-box h2.ok { color: #28a745; }
+    .status-box p { font-size: 1.1rem; margin-bottom: 10px; }
+    .badge {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      margin: 4px 6px 0 0;
+      font-weight: 600;
+    }
+    .ok { background: #28a745; color: #fff; }
+    .no { background: #dc3545; color: #fff; }
+
+    img.result {
+      display: none;
+      width: 100%;
+      border-radius: 8px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>EPI Detection</h1>
+    <div id="uploadTime"></div>
+
+    <div class="upload-zone" id="uploadZone">
+      <img id="preview" class="preview" alt="Aperçu" />
+      <div class="placeholder">
+        <strong>Glissez-déposez<br/>ou cliquez pour<br/>sélectionner</strong>
+        <p style="margin-top:8px; font-size:0.9rem;">(Casque, gilet, lunettes, gants)</p>
+      </div>
+      <input type="file" id="fileInput" accept="image/*" />
+    </div>
+
+    <div class="controls">
+      <button id="analyzeBtn" class="btn-primary" disabled>Analyser</button>
+      <button id="downloadBtn" class="btn-download" disabled>Télécharger</button>
+    </div>
+
+    <div id="statusBox" class="status-box">
+      <h2 id="statusHeader"></h2>
+      <p id="statusText"></p>
+      <div id="badges"></div>
+    </div>
+
+    <img id="resultImg" class="result" alt="Image annotée" />
+  </div>
+
+  <script>
+    const uploadZone   = document.getElementById('uploadZone'),
+          fileInput    = document.getElementById('fileInput'),
+          preview      = document.getElementById('preview'),
+          placeholder  = uploadZone.querySelector('.placeholder'),
+          uploadTime   = document.getElementById('uploadTime'),
+          analyzeBtn   = document.getElementById('analyzeBtn'),
+          downloadBtn  = document.getElementById('downloadBtn'),
+          statusBox    = document.getElementById('statusBox'),
+          statusHeader = document.getElementById('statusHeader'),
+          statusText   = document.getElementById('statusText'),
+          badges       = document.getElementById('badges'),
+          resultImg    = document.getElementById('resultImg');
+
+    let selectedFile = null;
+
+    function formatDate(d){
+      return d.toLocaleDateString('fr-FR') +
+             ' ' +
+             d.toLocaleTimeString('fr-FR');
+    }
+
+    function handleFile(file) {
+      if (!file) return;
+      selectedFile = file;
+      // show time
+      uploadTime.textContent = `Upload: ${formatDate(new Date())}`;
+      uploadTime.style.display = 'block';
+      // show preview
+      const url = URL.createObjectURL(file);
+      preview.src = url;
+      preview.style.display = 'block';
+      // hide placeholder
+      placeholder.style.opacity = '0';
+      setTimeout(()=> placeholder.style.display='none', 200);
+      analyzeBtn.disabled = false;
+      statusBox.style.display = 'none';
+      resultImg.style.display = 'none';
+      badges.innerHTML = '';
+    }
+
+    // Drag & drop
+    ['dragenter','dragover'].forEach(ev => {
+      uploadZone.addEventListener(ev, e => {
+        e.preventDefault();
+        uploadZone.classList.add('dragover');
+      });
+    });
+    ['dragleave','drop'].forEach(ev => {
+      uploadZone.addEventListener(ev, e => {
+        e.preventDefault();
+        uploadZone.classList.remove('dragover');
+      });
+    });
+    uploadZone.addEventListener('drop', e => {
+      const file = e.dataTransfer.files[0];
+      handleFile(file);
+      fileInput.value = '';
+    });
+
+    // Click to select
+    uploadZone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => {
+      handleFile(fileInput.files[0]);
+      fileInput.value = '';
+    });
+
+    analyzeBtn.addEventListener('click', async () => {
+      analyzeBtn.disabled = true;
+      const spinner = document.createElement('span');
+      spinner.className = 'spinner';
+      analyzeBtn.appendChild(spinner);
+
+      const fd = new FormData();
+      fd.append('image', selectedFile);
+
+      const res = await fetch('/detect/', { method:'POST', body:fd });
+      analyzeBtn.removeChild(spinner);
+      analyzeBtn.disabled = false;
+
+      if (!res.ok) {
+        badges.innerHTML = '';
+        statusHeader.textContent = '⚠️ WARNING';
+        statusHeader.className = 'warning';
+        statusText.textContent = `Erreur API : ${res.status}`;
+        statusBox.style.display = 'block';
+        return;
+      }
+
+      const { status, missing, image_b64 } = await res.json();
+
+      // Header
+      if (status === 'all_good') {
+        statusHeader.textContent = '✅ ALL GOOD';
+        statusHeader.className = 'ok';
+        statusText.textContent = 'Tous les EPI sont présents.';
+      } else {
+        statusHeader.textContent = '⚠️ WARNING';
+        statusHeader.className = 'warning';
+        statusText.textContent = 'Équipements manquants :';
+      }
+
+      // badges
+      badges.innerHTML = '';
+      ['helmet','vest','goggles','gloves'].forEach(lbl => {
+        const span = document.createElement('span');
+        span.className = 'badge ' + (missing.includes(lbl) ? 'no' : 'ok');
+        span.textContent = (missing.includes(lbl) ? '❌ ' : '✅ ') + lbl;
+        badges.appendChild(span);
+      });
+
+      statusBox.style.display = 'block';
+
+      // show annotated image
+      resultImg.src = 'data:image/jpeg;base64,' + image_b64;
+      resultImg.style.display = 'block';
+
+      // enable download
+      downloadBtn.disabled = false;
+      downloadBtn.onclick = () => {
+        const a = document.createElement('a');
+        a.href = resultImg.src;
+        a.download = 'epi_result.jpg';
+        a.click();
+      };
+    });
+  </script>
+</body>
+</html>
