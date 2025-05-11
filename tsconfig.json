@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "jsx": "react-jsx",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": ["vite/client"],
+    "paths": {
+      "@/*": ["./src/*"]
+    },    "types": ["@emotion/react/types/css-prop"]
+
+  },
+  "include": ["src", "vite.config.ts"],
+  "exclude": ["node_modules"],
+
+
+}
